@@ -1,0 +1,117 @@
+### Blog API Testing File
+### Use with REST Client extension in VS Code or Thunder Client
+
+@baseUrl = http://localhost:5000/api
+@token = your-jwt-token-here
+
+### 1. Register Admin User
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Admin User",
+  "email": "admin@example.com",
+  "password": "password123"
+}
+
+### 2. Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "password123"
+}
+
+### 3. Get All Blogs (Public)
+GET {{baseUrl}}/blogs
+
+### 4. Get All Blogs with Filters
+GET {{baseUrl}}/blogs?status=published&category=Technology&page=1&limit=10
+
+### 5. Search Blogs
+GET {{baseUrl}}/blogs?search=nodejs
+
+### 6. Create Blog (Admin - with image)
+# Note: Use Postman/Thunder Client for file upload
+POST {{baseUrl}}/blogs
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data
+
+# Form Data:
+# title: My First Blog Post
+# content: This is a detailed blog post...
+# excerpt: A brief summary
+# coverImage: [Select File]
+# category: Technology
+# tags: ["nodejs", "express"]
+# status: published
+# isFeatured: true
+
+### 7. Get Single Blog by Slug
+GET {{baseUrl}}/blogs/my-first-blog-post
+
+### 8. Update Blog (Admin)
+PUT {{baseUrl}}/blogs/blog-id-here
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Updated Blog Title",
+  "content": "Updated content...",
+  "status": "published"
+}
+
+### 9. Toggle Blog Status (Admin)
+PATCH {{baseUrl}}/blogs/blog-id-here/toggle-status
+Authorization: Bearer {{token}}
+
+### 10. Like Blog
+POST {{baseUrl}}/blogs/blog-id-here/like
+
+### 11. Get Blog Stats (Admin)
+GET {{baseUrl}}/blogs/admin/stats
+Authorization: Bearer {{token}}
+
+### 12. Delete Blog (Admin)
+DELETE {{baseUrl}}/blogs/blog-id-here
+Authorization: Bearer {{token}}
+
+### ===== COMMENTS =====
+
+### 13. Add Comment (Authenticated)
+POST {{baseUrl}}/comments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "blogId": "blog-id-here",
+  "content": "Great article! Very informative."
+}
+
+### 14. Add Reply to Comment
+POST {{baseUrl}}/comments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "blogId": "blog-id-here",
+  "content": "Thanks for the feedback!",
+  "parentCommentId": "parent-comment-id-here"
+}
+
+### 15. Get Blog Comments
+GET {{baseUrl}}/comments/blog/blog-id-here?page=1&limit=20
+
+### 16. Update Comment (Owner)
+PUT {{baseUrl}}/comments/comment-id-here
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "content": "Updated comment text"
+}
+
+### 17. Delete Comment (Owner or Admin)
+DELETE {{baseUrl}}/comments/comment-id-here
+Authorization: Bearer {{token}}

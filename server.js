@@ -2,8 +2,22 @@ require('dotenv').config();
 const app = require('./src/app');
 const connectDB = require('./src/config/database');
 const { connectRedis } = require('./src/config/redis');
+const http = require('http');
+const initializeSocket = require('./src/config/socket');
 
 const PORT = process.env.PORT || 5000;
+
+// Create HTTP server
+const server = http.createServer(app);
+
+// Initialize Socket.IO
+const io = initializeSocket(server);
+
+// Make io accessible to routes
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
 
 // Initialize connections
 const initializeServer = async () => {
@@ -20,10 +34,11 @@ const initializeServer = async () => {
     }
 
     // Start server
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📚 API Documentation: http://localhost:${PORT}/api`);
       console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
+      console.log(`💬 Socket.IO enabled for real-time comments`);
     });
   } catch (error) {
     console.error('❌ Failed to initialize server:', error);

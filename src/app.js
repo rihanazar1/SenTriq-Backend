@@ -6,6 +6,8 @@ const appRoutes = require('./routes/app.Routes');
 const vaultRoutes = require('./routes/vault.Routes');
 const fakeDataRoutes = require('./routes/fakeData.Routes');
 const emailBreachRoutes = require('./routes/emailBreach.Routes');
+const blogRoutes = require('./routes/blog.Routes');
+const commentRoutes = require('./routes/comment.Routes');
 const { createGeneralLimiter, createAuthLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
@@ -26,6 +28,8 @@ app.use('/api/apps', appRoutes);
 app.use('/api/vault', vaultRoutes);
 app.use('/api/fake-data', fakeDataRoutes);
 app.use('/api/email-breach', emailBreachRoutes);
+app.use('/api/blogs', blogRoutes);
+app.use('/api/comments', commentRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({
@@ -78,6 +82,22 @@ app.get('/api', (req, res) => {
         stats: 'GET /api/email-breach/stats',
         trends: 'GET /api/email-breach/trends',
         search: 'GET /api/email-breach/search'
+      },
+      blogs: {
+        getAll: 'GET /api/blogs',
+        getBySlug: 'GET /api/blogs/:slug',
+        create: 'POST /api/blogs (Admin)',
+        update: 'PUT /api/blogs/:id (Admin)',
+        delete: 'DELETE /api/blogs/:id (Admin)',
+        toggleStatus: 'PATCH /api/blogs/:id/toggle-status (Admin)',
+        like: 'POST /api/blogs/:id/like',
+        stats: 'GET /api/blogs/admin/stats (Admin)'
+      },
+      comments: {
+        add: 'POST /api/comments',
+        getBlogComments: 'GET /api/comments/blog/:blogId',
+        update: 'PUT /api/comments/:id',
+        delete: 'DELETE /api/comments/:id'
       }
     }
   });
