@@ -25,6 +25,10 @@ const blogSchema = new mongoose.Schema({
   coverImageFileId: {
     type: String,
   },
+  contentImageFileIds: {
+    type: [String],
+    default: [],
+  },
   author: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -100,7 +104,7 @@ module.exports = mongoose.model("Blog", blogSchema);
 
 
 
-// Fake Comment Data 
+// Fake Comment Data
 
 // {
 //   "blogId": "your-blog-id-here",
@@ -110,7 +114,7 @@ module.exports = mongoose.model("Blog", blogSchema);
 //   "blogId": "your-blog-id-here",
 //   "content": "Very informative post. Could you also cover error handling in the next tutorial?"
 // }
-// Reply 
+// Reply
 // {
 //   "blogId": "your-blog-id-here",
 //   "content": "Thanks for the feedback! I'll definitely cover that in the next post.",

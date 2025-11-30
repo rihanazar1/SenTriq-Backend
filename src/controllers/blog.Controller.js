@@ -1,12 +1,12 @@
 const asyncHandler = require('express-async-handler');
 const Blog = require('../models/blogSchema');
 const Comment = require('../models/commentSchema');
-const { uploadToImageKit, deleteFromImageKit } = require('../utils/imageUpload');
+const { uploadToImageKit, deleteFromImageKit, processContentImages } = require('../utils/imageUpload');
 const slugify = require('slugify');
 
 // Create blog (Admin only)
 const createBlog = asyncHandler(async (req, res) => {
-  const { title, content, excerpt, category, tags, status, isFeatured, metaTitle, metaDescription } = req.body;
+  const { title, content, excerpt, category, tags, status, isFeatured, metaTitle, metaDescription, slug: customSlug } = req.body;
 
   let coverImageUrl = null;
   let coverImageFileId = null;
@@ -31,17 +31,35 @@ const createBlog = asyncHandler(async (req, res) => {
     console.log('No file received in request');
   }
 
-  // Generate slug from title
-  const slug = slugify(title, { lower: true, strict: true });
+  // Use custom slug from frontend or generate from title
+  let slug;
+  if (customSlug && customSlug.trim()) {
+    // Sanitize the custom slug
+    slug = slugify(customSlug.trim(), { lower: true, strict: true });
+    
+    // Validate minimum length
+    if (slug.length < 3) {
+      return res.status(400).json({
+        success: false,
+        error: 'Slug must be at least 3 characters long'
+      });
+    }
+  } else {
+    // Fallback: Generate slug from title
+    slug = slugify(title, { lower: true, strict: true });
+  }
 
   // Check if slug already exists
   const existingBlog = await Blog.findOne({ slug });
   if (existingBlog) {
     return res.status(400).json({
       success: false,
-      error: 'Blog with this title already exists'
+      error: 'Blog with this slug already exists. Please use a different slug.'
     });
   }
+
+  // Process content images - extract and upload to ImageKit
+  const { content: processedContent, fileIds: contentImageFileIds } = await processContentImages(content);
 
   // Parse tags - handle array, JSON string, or comma-separated string
   let parsedTags = [];
@@ -63,10 +81,11 @@ const createBlog = asyncHandler(async (req, res) => {
   const blog = await Blog.create({
     title,
     slug,
-    content,
+    content: processedContent,
     excerpt,
     coverImage: coverImageUrl,
     coverImageFileId,
+    contentImageFileIds,
     author: req.user._id,
     category,
     tags: parsedTags,
@@ -203,7 +222,7 @@ const getBlogBySlug = asyncHandler(async (req, res) => {
 // Update blog (Admin only)
 const updateBlog = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { title, content, excerpt, category, tags, status, isFeatured, metaTitle, metaDescription } = req.body;
+  const { title, content, excerpt, category, tags, status, isFeatured, metaTitle, metaDescription, slug: customSlug } = req.body;
 
   const blog = await Blog.findById(id);
 
@@ -228,9 +247,47 @@ const updateBlog = asyncHandler(async (req, res) => {
     }
   }
 
-  // Update slug if title changed
-  if (title && title !== blog.title) {
-    blog.slug = slugify(title, { lower: true, strict: true });
+  // Update slug if custom slug provided or title changed
+  if (customSlug && customSlug.trim()) {
+    const newSlug = slugify(customSlug.trim(), { lower: true, strict: true });
+    
+    if (newSlug.length < 3) {
+      return res.status(400).json({
+        success: false,
+        error: 'Slug must be at least 3 characters long'
+      });
+    }
+    
+    // Check if new slug already exists (excluding current blog)
+    if (newSlug !== blog.slug) {
+      const existingBlog = await Blog.findOne({ slug: newSlug });
+      if (existingBlog) {
+        return res.status(400).json({
+          success: false,
+          error: 'Blog with this slug already exists. Please use a different slug.'
+        });
+      }
+      blog.slug = newSlug;
+    }
+  } else if (title && title !== blog.title) {
+    // Fallback: Update slug if title changed
+    const newSlug = slugify(title, { lower: true, strict: true });
+    if (newSlug !== blog.slug) {
+      const existingBlog = await Blog.findOne({ slug: newSlug });
+      if (!existingBlog) {
+        blog.slug = newSlug;
+      }
+    }
+  }
+
+  // Process content images if content is being updated
+  let processedContent = blog.content;
+  let newContentImageFileIds = [...blog.contentImageFileIds];
+  
+  if (content && content !== blog.content) {
+    const result = await processContentImages(content);
+    processedContent = result.content;
+    newContentImageFileIds = [...newContentImageFileIds, ...result.fileIds];
   }
 
   // Parse tags - handle array, JSON string, or comma-separated string
@@ -248,7 +305,7 @@ const updateBlog = asyncHandler(async (req, res) => {
   }
 
   blog.title = title || blog.title;
-  blog.content = content || blog.content;
+  blog.content = processedContent;
   blog.excerpt = excerpt || blog.excerpt;
   blog.category = category || blog.category;
   blog.tags = parsedTags;
@@ -256,6 +313,7 @@ const updateBlog = asyncHandler(async (req, res) => {
   blog.isFeatured = isFeatured !== undefined ? isFeatured === 'true' : blog.isFeatured;
   blog.metaTitle = metaTitle || blog.metaTitle;
   blog.metaDescription = metaDescription || blog.metaDescription;
+  blog.contentImageFileIds = newContentImageFileIds;
 
   await blog.save();
 
@@ -283,6 +341,17 @@ const deleteBlog = asyncHandler(async (req, res) => {
   // Delete cover image from ImageKit
   if (blog.coverImageFileId) {
     await deleteFromImageKit(blog.coverImageFileId);
+  }
+
+  // Delete all content images from ImageKit
+  if (blog.contentImageFileIds && blog.contentImageFileIds.length > 0) {
+    for (const fileId of blog.contentImageFileIds) {
+      try {
+        await deleteFromImageKit(fileId);
+      } catch (error) {
+        console.error(`Failed to delete content image ${fileId}:`, error.message);
+      }
+    }
   }
 
   // Delete all comments associated with this blog
